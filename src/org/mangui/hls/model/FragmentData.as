@@ -15,6 +15,8 @@ package org.mangui.hls.model {
         public var valid : Boolean;
         /** fragment byte array **/
         public var bytes : ByteArray;
+        /* Total bytes this Fragment _will_ have */
+        public var bytesTotal: int;
         /** bytes Loaded **/
         public var bytesLoaded : int;
         /** AES decryption instance **/
