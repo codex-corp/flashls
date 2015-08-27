@@ -110,7 +110,6 @@ package org.mangui.hls.demux {
                                   callback_error : Function,
                                   callback_videometadata : Function,
                                   audioOnly : Boolean) {
-            _avcc = null;
             _curAudioPES = null;
             _curVideoPES = null;
             _curId3PES = null;
@@ -137,6 +136,7 @@ package org.mangui.hls.demux {
         /** append new TS data */
         public function append(data : ByteArray) : void {
             if (_dataVector == null) {
+		_avcc = null;
                 _dataVector = new Vector.<ByteArray>();
                 _dataComplete = false;
                 _readPosition = 0;
@@ -477,16 +477,7 @@ package org.mangui.hls.demux {
                             /* push current data into video tag, if any */
                             _curVideoTag.push(_curNalUnit, 0, _curNalUnit.length);
                         }
-                        // only push current tag if AVC HEADER has been pushed already
-                        if(_avcc) {
-                            _curVideoTag.build();
-                            _tags.push(_curVideoTag);
-                        }
-                        CONFIG::LOGGING {
-                            if(!_avcc) {
-                                Log.warn("TS: discarding video tag, as AVC HEADER not found yet, fragment not starting with I-Frame ?");
-                            }
-                        }
+                        _tags.push(_curVideoTag);
                     }
                     _curNalUnit = new ByteArray();
                     _curVideoTag = new FLVTag(FLVTag.AVC_NALU, pes.pts, pes.dts, false);
