@@ -83,11 +83,12 @@ package com.pivotshare.hls.loader {
          * @method  close
          */
         public function close() : void {
+
             if (_fragmentURLStream && _fragmentURLStream.connected) {
                 _fragmentURLStream.close();
             }
 
-            if (_fragment) {
+            if (_fragment && _fragment.data) {
 
                 if (_fragment.data.decryptAES) {
                     _fragment.data.decryptAES.cancel();
@@ -96,8 +97,10 @@ package com.pivotshare.hls.loader {
 
                 // Explicitly release memory
                 // http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/utils/ByteArray.html#clear()
-                _fragment.data.bytes.clear();
-                _fragment.data.bytes = null;
+                if (_fragment.data.bytes) {
+                    _fragment.data.bytes.clear();
+                    _fragment.data.bytes = null;
+                }
             }
         }
 
