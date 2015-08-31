@@ -310,5 +310,16 @@ package org.mangui.hls {
          * Default is true
          */
         public static var logError : Boolean = true;
+
+        /**
+         * recoverFromNonIDRStartFragment
+         *
+         * Load same sequence Fragment from previous Level and splice with
+         * current Fragment when that Fragment does not start with necessary
+         * AVC header.
+         *
+         * Default is true
+         */
+        public static var recoverFromNonIDRStartFragment : Boolean = true;
     }
 }
