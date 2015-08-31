@@ -51,6 +51,12 @@ package org.mangui.hls.model {
         /* ID3 tags linked to this fragment */
         public var id3_tags : Vector.<ID3Tag>;
 
+        /** Whether this Fragment starts with IDR **/
+        public var starts_with_idr : Boolean;
+
+        /** PTS of earliest AVC_HEADER */
+        public var pts_min_video_header : Number;
+
         /**  tag duration */
         private var audio_tag_duration : Number;
         private var video_tag_duration : Number;
@@ -64,6 +70,8 @@ package org.mangui.hls.model {
             this.valid = true;
             this.video_width = 0;
             this.video_height = 0;
+            this.starts_with_idr = false;
+            this.pts_min_video_header = NaN;
         };
 
         public function appendTags(tags : Vector.<FLVTag>) : void {
@@ -86,6 +94,9 @@ package org.mangui.hls.model {
                         pts_max_audio = Math.max(pts_max_audio, tag.pts);
                         break;
                     case FLVTag.AVC_HEADER:
+                        if (isNaN(pts_min_video_header)) {
+                            pts_min_video_header = tag.pts;
+                        }
                     case FLVTag.AVC_NALU:
                         video_found = true;
                         tags_video_found = true;
@@ -95,6 +106,7 @@ package org.mangui.hls.model {
                         tags_pts_max_video = Math.max(tags_pts_max_video, tag.pts);
                         pts_min_video = Math.min(pts_min_video, tag.pts);
                         pts_max_video = Math.max(pts_max_video, tag.pts);
+                        starts_with_idr = !isNaN(pts_min_video_header) && pts_min_video_header <= tag.pts;
                         break;
                     case FLVTag.DISCONTINUITY:
                     case FLVTag.METADATA:
@@ -113,6 +125,8 @@ package org.mangui.hls.model {
             pts_min_audio = pts_min_video = dts_min = tags_pts_min_audio = tags_pts_min_video = Number.POSITIVE_INFINITY;
             pts_max_audio = pts_max_video = tags_pts_max_audio = tags_pts_max_video = Number.NEGATIVE_INFINITY;
             audio_found = video_found = tags_audio_found = tags_video_found = false;
+            starts_with_idr = false;
+            pts_min_video_header = NaN;
         }
 
         public function shiftTags() : void {
