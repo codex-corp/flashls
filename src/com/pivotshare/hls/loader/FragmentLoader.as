@@ -148,6 +148,23 @@ package com.pivotshare.hls.loader {
         private var _fragLoadStatus : int;
         private var _fragSkipping : Boolean;
 
+        /*
+         * Whether _onDemuxProgress event listener has been called at least once
+         * for current Fragment.
+         */
+        private var _hasDemuxProgressedOnce : Boolean;
+
+        /*
+         * Emergency Fragment to be loaded if current Fragment does not start
+         * with an IDR.
+         */
+        private var _emergencyFragment : Fragment;
+
+        /*
+         * FragmentDemuxedStream to for emergency Fragment.
+         */
+        private var _emergencyFragmentDemuxedStream : FragmentDemuxedStream;
+
         //
         //
         //
@@ -182,6 +199,10 @@ package com.pivotshare.hls.loader {
             _loadingState = LOADING_STOPPED;
             _manifestJustLoaded = false;
             _keyLoader = new KeyLoader();
+
+            _hasDemuxProgressedOnce = false;
+            _emergencyFragment = null;
+            _emergencyFragmentDemuxedStream = null;
         };
 
         /**
@@ -1028,8 +1049,57 @@ package com.pivotshare.hls.loader {
                 HLSSettings.startFromBitrate !== -1 ||
                 _levels.length == 1;
 
+            var previousLevel : int = _fragPrevious !== null ? _fragPrevious.level : _fragCurrent.level;
+
+            var mustRecoverFromNonIDRStart : Boolean =
+                HLSSettings.recoverFromNonIDRStartFragment &&
+                !_fragCurrent.data.starts_with_idr &&
+                _fragCurrent.level !== previousLevel; // TODO
+
+            // If this is the first Progress call for this Fragment
+            if (!_hasDemuxProgressedOnce) {
+
+                _hasDemuxProgressedOnce = true;
+
+                CONFIG::LOGGING {
+                    Log.debug2("FragmentLoader#_onDemuxProgress: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] starts with IDR? " + _fragCurrent.data.starts_with_idr +
+                        "@" + _fragCurrent.data.pts_min_video_header);
+                }
+
+                //
+                // Check for IDR at beginning of Fragment on Level switch
+                //
+                // If Fragment does not start with IDR then async stream same
+                // sequence at previous Level.
+                //
+                if (mustRecoverFromNonIDRStart) {
+
+                    CONFIG::LOGGING {
+                        Log.debug("FragmentLoader#_onDemuxProgress: Fragment["
+                            + _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                            "] DOES NOT start with IDR! Will load same sequence at previous level to recover.");
+                    }
+
+                    _emergencyFragment = _levels[previousLevel].getFragmentfromSeqNum(_fragCurrent.seqnum);
+
+                    // Initiate loading of same seqnum Fragment on previous level to find IDR
+                    _keyLoader.load(_emergencyFragment.decrypt_url, function (err : HLSError, keyData : ByteArray) : void {
+                        _emergencyFragmentDemuxedStream = new FragmentDemuxedStream(_hls.stage);
+                        _emergencyFragmentDemuxedStream.load(_emergencyFragment, keyData, null);
+                    });
+                }
+            }
+
+            //
+            // TODO: We have temporarily disabled progressive buffering, as it
+            // does not seem to work with IDR recovery. Seems PTS analysis
+            // changes expected states. Needs to be debugged further.
+            //
+            /*
             // Determine if we can do progressively append to StreamBuffer
-            if (_fragmentFirstLoaded || (_manifestJustLoaded && isFirstFragmentLevelDefined)) {
+            if (!mustRecoverFromNonIDRStart && (_fragmentFirstLoaded || (_manifestJustLoaded && isFirstFragmentLevelDefined))) {
 
                 //
                 // if audio expected, PTS analysis is done on audio
@@ -1129,7 +1199,7 @@ package com.pivotshare.hls.loader {
                     _hasDiscontinuity = false;
                 }
             }
-
+            */
         }
 
         /**
@@ -1172,6 +1242,50 @@ package com.pivotshare.hls.loader {
                             (_fragCurrent.data.pts_min_video - _fragCurrent.data.pts_min_audio) +
                             "/" + (_fragCurrent.data.pts_max_video - _fragCurrent.data.pts_max_audio));
                     }
+                }
+            }
+
+            //
+            // Handle possible IDR Problem here
+            // TODO: We should still have have simple removal of frames as option
+            //
+            if (_emergencyFragment) {
+
+                _emergencyFragment = _emergencyFragmentDemuxedStream.getFragment();
+
+                // Return all tags (audio/video) unless it is Video tag that precedes IDR
+                var isNotBadVideoTag : Function = function (tag:FLVTag, index:int, vector:Vector.<FLVTag>):Boolean {
+                    return tag.type !== FLVTag.AVC_NALU || tag.pts >= _fragCurrent.data.pts_min_video_header;
+                }
+
+                // Return only Video tags that precede and IDR
+                var isGoodVideoTag : Function = function (tag:FLVTag, index:int, vector:Vector.<FLVTag>):Boolean {
+                    return tag.type == FLVTag.AVC_NALU && tag.pts < _fragCurrent.data.pts_min_video_header;
+                }
+
+                // It's already been found
+                if (!isNaN(_emergencyFragment.data.pts_min_video_header)) {
+                    CONFIG::LOGGING {
+                        Log.debug("FragmentLoader#_fragParsingCompleteHandler: Will fix non-IDR right now!");
+                    }
+
+                    var tagsExceptBadVideo : Vector.<FLVTag> = _fragCurrent.data.tags.filter(isNotBadVideoTag);
+                    var goodNonIDRTags : Vector.<FLVTag> = _emergencyFragment.data.tags.filter(isGoodVideoTag);
+
+                    _fragCurrent.data.tags = goodNonIDRTags.concat(tagsExceptBadVideo);
+
+                    _emergencyFragment = null;
+                    // TODO: Remove listener?
+                    _emergencyFragmentDemuxedStream.close();
+                    _emergencyFragmentDemuxedStream.removeEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
+                    _emergencyFragmentDemuxedStream = null;
+
+                } else { // bail leaving _emergencyFragment callback to recall this callback :(
+                    CONFIG::LOGGING {
+                        Log.debug("FragmentLoader#_fragParsingCompleteHandler: Cannot fix this non-IDR Fragment yet.");
+                    }
+                    _emergencyFragmentDemuxedStream.addEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
+                    return;
                 }
             }
 
@@ -1282,6 +1396,9 @@ package com.pivotshare.hls.loader {
                         _hls.dispatchEvent(new HLSEvent(HLSEvent.TAGS_LOADED, _metrics));
                         _fragCurrent.data.shiftTags();
                         _hasDiscontinuity = false;
+
+                        _hasDemuxProgressedOnce = false;
+                        _emergencyFragment = null;
                     }
 
                 } else {
@@ -1349,6 +1466,17 @@ package com.pivotshare.hls.loader {
          */
         private function _onDemuxID3TagFound(id3_tags : Vector.<ID3Tag>) : void {
             _fragCurrent.data.id3_tags = id3_tags;
+        }
+
+        /**
+         * Called when emergency Fragment has finished loading and demuxing.
+         *
+         * @method  _onEmergencyDemuxedStreamComplete
+         * @param   {Event}  evt
+         */
+        private function _onEmergencyDemuxedStreamComplete (evt : Event) : void {
+            _emergencyFragment = _emergencyFragmentDemuxedStream.getFragment();
+            _onDemuxComplete();
         }
     }
 }
