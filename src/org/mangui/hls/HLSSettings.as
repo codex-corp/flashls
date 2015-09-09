@@ -312,14 +312,35 @@ package org.mangui.hls {
         public static var logError : Boolean = true;
 
         /**
-         * recoverFromNonIDRStartFragment
+         * recoverFromNonIDRLevelUp
          *
-         * Load same sequence Fragment from previous Level and splice with
-         * current Fragment when that Fragment does not start with necessary
-         * AVC header.
+         * On level up, load same sequence Fragment from previous Level and
+         * splice with current Fragment when that Fragment does not start with
+         * necessary AVC header.
          *
          * Default is true
          */
-        public static var recoverFromNonIDRStartFragment : Boolean = true;
+        public static var recoverFromNonIDRLevelUp : Boolean = true;
+
+        /**
+         * recoverFromNonIDRLevelDown
+         *
+         * On level down, load same sequence Fragment from previous Level and
+         * splice with current Fragment when that Fragment does not start with
+         * necessary AVC header.
+         *
+         * Default is true
+         */
+        public static var recoverFromNonIDRLevelDown : Boolean = true;
+
+        /**
+         * removePreIDRVideoTags
+         *
+         * If Fragment does not start with necessary AVC header and is not set
+         * to recover, then filter out preceding video tags.
+         *
+         * Default is true
+         */
+        public static var removePreIDRVideoTags : Boolean = true;
     }
 }

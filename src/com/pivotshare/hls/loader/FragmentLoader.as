@@ -398,7 +398,7 @@ package com.pivotshare.hls.loader {
                                 // abort fragment loading ...
                                 CONFIG::LOGGING {
                                     Log.warn("FragmentLoader#_checkLoading: loading too slow, abort fragment loading");
-                                    Log.warn("fragLoadedDelay/bufferLen/fragLevel0LoadedDelay:" + fragLoadedDelay.toFixed(1) + "/" + bufferLen.toFixed(1) + "/" + fragLevel0LoadedDelay.toFixed(1));
+                                    Log.warn("fragLoadedDelay/bufferLen/fragLevel0LoadedDelay: " + fragLoadedDelay.toFixed(1) + " / " + bufferLen.toFixed(1) + " / " + fragLevel0LoadedDelay.toFixed(1));
                                 }
                                 //abort fragment loading
                                 _stop_load();
@@ -1051,18 +1051,14 @@ package com.pivotshare.hls.loader {
 
             var previousLevel : int = _fragPrevious !== null ? _fragPrevious.level : _fragCurrent.level;
 
-            var mustRecoverFromNonIDRStart : Boolean =
-                HLSSettings.recoverFromNonIDRStartFragment &&
-                !_fragCurrent.data.starts_with_idr &&
-                _fragCurrent.level !== previousLevel; // TODO
-
-            // If this is the first Progress call for this Fragment
-            if (!_hasDemuxProgressedOnce) {
+            // If this is the first _onDemuxProgress call for this Fragment with
+            // any video tags having been parsed
+            if (!_hasDemuxProgressedOnce && _fragCurrent.data.video_found) {
 
                 _hasDemuxProgressedOnce = true;
 
                 CONFIG::LOGGING {
-                    Log.debug2("FragmentLoader#_onDemuxProgress: Fragment[" +
+                    Log.debug("FragmentLoader#_onDemuxProgress: Fragment[" +
                         _fragCurrent.level + "][" + _fragCurrent.seqnum +
                         "] starts with IDR? " + _fragCurrent.data.starts_with_idr +
                         "@" + _fragCurrent.data.pts_min_video_header);
@@ -1074,21 +1070,42 @@ package com.pivotshare.hls.loader {
                 // If Fragment does not start with IDR then async stream same
                 // sequence at previous Level.
                 //
-                if (mustRecoverFromNonIDRStart) {
+
+                var isNonIDRLevelUp : Boolean =
+                    _fragCurrent.level > previousLevel &&
+                    !_fragCurrent.data.starts_with_idr;
+
+                var isNonIDRLevelDown : Boolean =
+                    _fragCurrent.level < previousLevel &&
+                    !_fragCurrent.data.starts_with_idr;
+
+                if (isNonIDRLevelUp || isNonIDRLevelDown) {
 
                     CONFIG::LOGGING {
                         Log.debug("FragmentLoader#_onDemuxProgress: Fragment["
                             + _fragCurrent.level + "][" + _fragCurrent.seqnum +
-                            "] DOES NOT start with IDR! Will load same sequence at previous level to recover.");
+                            "] does not with start with IDR, but we need it to.");
                     }
 
-                    _emergencyFragment = _levels[previousLevel].getFragmentfromSeqNum(_fragCurrent.seqnum);
+                    if ((isNonIDRLevelUp && HLSSettings.recoverFromNonIDRLevelUp) ||
+                        (isNonIDRLevelDown && HLSSettings.recoverFromNonIDRLevelDown)) {
 
-                    // Initiate loading of same seqnum Fragment on previous level to find IDR
-                    _keyLoader.load(_emergencyFragment.decrypt_url, function (err : HLSError, keyData : ByteArray) : void {
-                        _emergencyFragmentDemuxedStream = new FragmentDemuxedStream(_hls.stage);
-                        _emergencyFragmentDemuxedStream.load(_emergencyFragment, keyData, null);
-                    });
+                        CONFIG::LOGGING {
+                            Log.debug("FragmentLoader#_onDemuxProgress: Fragment[" +
+                                _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                                "] fetching Fragment[ " +
+                                previousLevel + "][" + _fragCurrent.seqnum +
+                                "] to recover from non-IDR start");
+                        }
+
+                        _emergencyFragment = _levels[previousLevel].getFragmentfromSeqNum(_fragCurrent.seqnum);
+
+                        // Initiate loading of same seqnum Fragment on previous level to find IDR
+                        _keyLoader.load(_emergencyFragment.decrypt_url, function (err : HLSError, keyData : ByteArray) : void {
+                            _emergencyFragmentDemuxedStream = new FragmentDemuxedStream(_hls.stage);
+                            _emergencyFragmentDemuxedStream.load(_emergencyFragment, keyData, null);
+                        });
+                    }
                 }
             }
 
@@ -1229,63 +1246,112 @@ package com.pivotshare.hls.loader {
             }
             CONFIG::LOGGING {
                 if (_fragCurrent.data.audio_found) {
-                    Log.debug("FragmentLoader#_onDemuxComplete: m/M audio PTS:" +
-                        _fragCurrent.data.pts_min_audio + "/" + _fragCurrent.data.pts_max_audio);
+                    Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] m/M audio PTS:" + _fragCurrent.data.pts_min_audio +
+                        "/" + _fragCurrent.data.pts_max_audio);
                 }
                 if (_fragCurrent.data.video_found) {
-                    Log.debug("FragmentLoader#_onDemuxComplete: m/M video PTS:" +
-                        _fragCurrent.data.pts_min_video + "/" + _fragCurrent.data.pts_max_video);
+                    Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] m/M video PTS:" + _fragCurrent.data.pts_min_video +
+                        "/" + _fragCurrent.data.pts_max_video);
 
                     if (!_fragCurrent.data.audio_found) {
                     } else {
-                        Log.debug("FragmentLoader#_onDemuxComplete: Delta audio/video m/M PTS:" +
-                            (_fragCurrent.data.pts_min_video - _fragCurrent.data.pts_min_audio) +
-                            "/" + (_fragCurrent.data.pts_max_video - _fragCurrent.data.pts_max_audio));
+                        Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] Delta audio/video m/M PTS:" +
+                        (_fragCurrent.data.pts_min_video - _fragCurrent.data.pts_min_audio) +
+                        "/" + (_fragCurrent.data.pts_max_video - _fragCurrent.data.pts_max_audio));
                     }
                 }
             }
 
+            var previousLevel : int = _fragPrevious !== null ? _fragPrevious.level : _fragCurrent.level;
+
+            CONFIG::LOGGING {
+                Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                    _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                    "] IDR?/Level/PreviousLevel: " + _fragCurrent.data.starts_with_idr
+                    + " / " + _fragCurrent.level + " / " + previousLevel);
+            }
+
+            var isNonIDRLevelUp : Boolean =
+                _fragCurrent.level > previousLevel &&
+                !_fragCurrent.data.starts_with_idr;
+
+            var isNonIDRLevelDown : Boolean =
+                _fragCurrent.level < previousLevel &&
+                !_fragCurrent.data.starts_with_idr;
+
             //
             // Handle possible IDR Problem here
-            // TODO: We should still have have simple removal of frames as option
             //
-            if (_emergencyFragment) {
+            if (isNonIDRLevelUp || isNonIDRLevelDown) {
 
-                _emergencyFragment = _emergencyFragmentDemuxedStream.getFragment();
+                CONFIG::LOGGING {
+                    Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] did not start with IDR, but we'll implement some type of fix.");
+                }
 
-                // Return all tags (audio/video) unless it is Video tag that precedes IDR
+                /*
+                 * Returns all tags (audio/video) unless it is Video tag that precedes IDR
+                 */
                 var isNotBadVideoTag : Function = function (tag:FLVTag, index:int, vector:Vector.<FLVTag>):Boolean {
                     return tag.type !== FLVTag.AVC_NALU || tag.pts >= _fragCurrent.data.pts_min_video_header;
                 }
 
-                // Return only Video tags that precede and IDR
+                /*
+                 * Returns only Video tags that precede an IDR
+                 */
                 var isGoodVideoTag : Function = function (tag:FLVTag, index:int, vector:Vector.<FLVTag>):Boolean {
                     return tag.type == FLVTag.AVC_NALU && tag.pts < _fragCurrent.data.pts_min_video_header;
                 }
 
-                // It's already been found
-                if (!isNaN(_emergencyFragment.data.pts_min_video_header)) {
-                    CONFIG::LOGGING {
-                        Log.debug("FragmentLoader#_fragParsingCompleteHandler: Will fix non-IDR right now!");
+                if ((isNonIDRLevelUp   && HLSSettings.recoverFromNonIDRLevelUp) ||
+                    (isNonIDRLevelDown && HLSSettings.recoverFromNonIDRLevelDown)) {
+
+                    _emergencyFragment = _emergencyFragmentDemuxedStream.getFragment();
+
+                    // It's already been found
+                    if (!isNaN(_emergencyFragment.data.pts_min_video_header)) {
+                        CONFIG::LOGGING {
+                            Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                                _fragCurrent.level + "][" + _fragCurrent.seqnum + "] Will splice with previous Level for IDR start");
+                        }
+
+                        var tagsExceptBadVideo : Vector.<FLVTag> = _fragCurrent.data.tags.filter(isNotBadVideoTag);
+                        var goodNonIDRTags : Vector.<FLVTag> = _emergencyFragment.data.tags.filter(isGoodVideoTag);
+
+                        _fragCurrent.data.tags = goodNonIDRTags.concat(tagsExceptBadVideo);
+
+                        _emergencyFragment = null;
+                        // TODO: Remove listener?
+                        _emergencyFragmentDemuxedStream.close();
+                        _emergencyFragmentDemuxedStream.removeEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
+                        _emergencyFragmentDemuxedStream = null;
+
+                    } else { // bail leaving _emergencyFragment callback to recall this callback :(
+
+                        // TODO: Edge where this may not complete in time - do we force buffer or drop fix?
+                        _emergencyFragmentDemuxedStream.addEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
+
+                        CONFIG::LOGGING {
+                            Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                                _fragCurrent.level + "][" + _fragCurrent.seqnum + "] Cannot splice this non-IDR Fragment just yet");
+                        }
+
+                        return;
                     }
-
-                    var tagsExceptBadVideo : Vector.<FLVTag> = _fragCurrent.data.tags.filter(isNotBadVideoTag);
-                    var goodNonIDRTags : Vector.<FLVTag> = _emergencyFragment.data.tags.filter(isGoodVideoTag);
-
-                    _fragCurrent.data.tags = goodNonIDRTags.concat(tagsExceptBadVideo);
-
-                    _emergencyFragment = null;
-                    // TODO: Remove listener?
-                    _emergencyFragmentDemuxedStream.close();
-                    _emergencyFragmentDemuxedStream.removeEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
-                    _emergencyFragmentDemuxedStream = null;
-
-                } else { // bail leaving _emergencyFragment callback to recall this callback :(
+                }
+                else if (HLSSettings.removePreIDRVideoTags) {
                     CONFIG::LOGGING {
-                        Log.debug("FragmentLoader#_fragParsingCompleteHandler: Cannot fix this non-IDR Fragment yet.");
+                        Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                            _fragCurrent.level + "][" + _fragCurrent.seqnum + "] Will filter out pre-IDR video tags");
                     }
-                    _emergencyFragmentDemuxedStream.addEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
-                    return;
+                    _fragCurrent.data.tags = _fragCurrent.data.tags.filter(isNotBadVideoTag);
                 }
             }
 
@@ -1295,7 +1361,9 @@ package com.pivotshare.hls.loader {
             //
             _metrics.parsing_end_time = getTimer();
             CONFIG::LOGGING {
-                Log.debug("FragmentLoader#_onDemuxComplete: Total Process duration/length/bw: " +
+                Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                    _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                    "] Total Process duration/length/bw: " +
                     _metrics.processing_duration + " / " + _metrics.size + " / " +
                     Math.round(_metrics.bandwidth / 1024) + " kbps");
             }
@@ -1336,10 +1404,10 @@ package com.pivotshare.hls.loader {
                 _levelNext = -1;
 
                 CONFIG::LOGGING {
-                    Log.debug("FragmentLoader#_onDemuxComplete: Completed parsing of " +
-                        _fragCurrent.seqnum + " of [" + (_levels[_hls.loadLevel].start_seqnum) +
-                        "," + (_levels[_hls.loadLevel].end_seqnum) + "],level " +
-                        _hls.loadLevel + " m/M PTS:" + _fragCurrent.data.pts_min + "/" + _fragCurrent.data.pts_max);
+                    Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
+                        _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                        "] completed. m/M PTS:" + _fragCurrent.data.pts_min +
+                        "/" + _fragCurrent.data.pts_max);
                 }
 
                 // TODO: What type of Fragment do we have if this is false?
