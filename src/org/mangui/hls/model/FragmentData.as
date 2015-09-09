@@ -70,7 +70,7 @@ package org.mangui.hls.model {
             this.valid = true;
             this.video_width = 0;
             this.video_height = 0;
-            this.starts_with_idr = false;
+            this.starts_with_idr = true;
             this.pts_min_video_header = NaN;
         };
 
@@ -106,7 +106,9 @@ package org.mangui.hls.model {
                         tags_pts_max_video = Math.max(tags_pts_max_video, tag.pts);
                         pts_min_video = Math.min(pts_min_video, tag.pts);
                         pts_max_video = Math.max(pts_max_video, tag.pts);
-                        starts_with_idr = !isNaN(pts_min_video_header) && pts_min_video_header <= tag.pts;
+                        if (isNaN(pts_min_video_header)) {
+                            starts_with_idr = false;
+                        }
                         break;
                     case FLVTag.DISCONTINUITY:
                     case FLVTag.METADATA:
@@ -125,7 +127,7 @@ package org.mangui.hls.model {
             pts_min_audio = pts_min_video = dts_min = tags_pts_min_audio = tags_pts_min_video = Number.POSITIVE_INFINITY;
             pts_max_audio = pts_max_video = tags_pts_max_audio = tags_pts_max_video = Number.NEGATIVE_INFINITY;
             audio_found = video_found = tags_audio_found = tags_video_found = false;
-            starts_with_idr = false;
+            starts_with_idr = true;
             pts_min_video_header = NaN;
         }
 
