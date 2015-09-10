@@ -197,10 +197,10 @@ package com.pivotshare.hls.loader {
 
             CONFIG::LOGGING {
                 var fragmentString : String = "Fragment[" + _fragment.level + "][" + _fragment.seqnum + "]";
-                Log.debug("FragmentDemuxedStream#onStreamProgress: " +
+                Log.debug2("FragmentDemuxedStream#onStreamProgress: " +
                     fragmentString + " Progress - " + evt.bytesLoaded + " of " + evt.bytesTotal);
 
-                Log.debug("FragmentDemuxedStream#onStreamProgress: " +
+                Log.debug2("FragmentDemuxedStream#onStreamProgress: " +
                     fragmentString + " Fragment status - bytes.position / bytes.length / bytesLoaded " +
                     _fragment.data.bytes.position + " / " +
                     _fragment.data.bytes.length + " / " +
@@ -232,7 +232,7 @@ package com.pivotshare.hls.loader {
                 //byteArray = bytes;
                 CONFIG::LOGGING {
                     var fragmentString : String = "Fragment[" + _fragment.level + "][" + _fragment.seqnum + "]";
-                    Log.debug("FragmentDemuxedStream#onStreamProgress: Need a Demuxer for " + fragmentString);
+                    Log.debug2("FragmentDemuxedStream#onStreamProgress: Need a Demuxer for " + fragmentString);
                 }
 
                 _demux = DemuxHelper.probe(
@@ -339,7 +339,7 @@ package com.pivotshare.hls.loader {
          */
         private function _onDemuxProgress(tags : Vector.<FLVTag>) : void {
             CONFIG::LOGGING {
-                Log.debug("FragmentDemuxedStream#_onDemuxProgress");
+                Log.debug2("FragmentDemuxedStream#_onDemuxProgress");
             }
 
             _fragment.data.appendTags(tags);
@@ -367,7 +367,7 @@ package com.pivotshare.hls.loader {
          */
         private function _onDemuxComplete() : void {
             CONFIG::LOGGING {
-                Log.debug("FragmentDemuxedStream#_onDemuxComplete");
+                Log.debug2("FragmentDemuxedStream#_onDemuxComplete");
             }
 
             _metrics.parsing_end_time = getTimer();
@@ -388,7 +388,7 @@ package com.pivotshare.hls.loader {
         private function _onDemuxVideoMetadata(width : uint, height : uint) : void {
             if (_fragment.data.video_width == 0) {
                 CONFIG::LOGGING {
-                    Log.debug("FragmentDemuxedStream#_onDemuxVideoMetadata: AVC SPS = " + width + "x" + height);
+                    Log.debug2("FragmentDemuxedStream#_onDemuxVideoMetadata: AVC SPS = " + width + "x" + height);
                 }
                 _fragment.data.video_width = width;
                 _fragment.data.video_height = height;
