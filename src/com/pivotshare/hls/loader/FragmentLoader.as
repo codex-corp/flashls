@@ -372,7 +372,7 @@ package com.pivotshare.hls.loader {
                  * loading to determine if we should stay at current bitrate.
                  */
                 case LOADING_IN_PROGRESS:
-                     if(_hls.autoLevel && _fragCurrent.level) {
+                     if(_hls.autoLevel && _fragCurrent.level && _fragmentFirstLoaded) {
 
                         // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
                         var requestDelay : int = getTimer() - _metrics.loading_request_time;
