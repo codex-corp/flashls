@@ -72,6 +72,11 @@ package com.pivotshare.hls.loader {
          */
         private var _options : Object;
 
+        /*
+         * Whether Fragment has completed processing (loading/demuxing).
+         */
+        private var _complete : Boolean;
+
         //
         //
         //
@@ -99,6 +104,7 @@ package com.pivotshare.hls.loader {
             _metrics = null;
             _demux = null;
             _options = new Object();
+            _complete = false;
         };
 
         /*
@@ -110,6 +116,16 @@ package com.pivotshare.hls.loader {
          */
         public function getFragment() : Fragment {
             return _fragment;
+        }
+
+        /**
+         * Whether Fragment has completed loading and demuxing.
+         *
+         * @method  complete
+         * @return  {Boolean}
+         */
+        public function get complete():Boolean {
+            return _complete;
         }
 
         /*
@@ -371,6 +387,7 @@ package com.pivotshare.hls.loader {
             }
 
             _metrics.parsing_end_time = getTimer();
+            _complete = true;
 
             var completeEvent : Event = new ProgressEvent(Event.COMPLETE);
             dispatchEvent(completeEvent);
