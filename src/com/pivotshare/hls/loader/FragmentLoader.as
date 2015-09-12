@@ -1313,10 +1313,12 @@ package com.pivotshare.hls.loader {
                 if ((isNonIDRLevelUp   && HLSSettings.recoverFromNonIDRLevelUp) ||
                     (isNonIDRLevelDown && HLSSettings.recoverFromNonIDRLevelDown)) {
 
+                    // Setting isComplete here to prevent any weird race conditions
+                    var isComplete = _emergencyFragmentDemuxedStream.complete;
                     _emergencyFragment = _emergencyFragmentDemuxedStream.getFragment();
 
-                    // It's already been found
-                    if (!isNaN(_emergencyFragment.data.pts_min_video_header)) {
+                    // We have the necessary tags to fix
+                    if (_emergencyFragment.data.pts_max_video >= _fragCurrent.data.pts_min_video_header) {
                         CONFIG::LOGGING {
                             Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
                                 _fragCurrent.level + "][" + _fragCurrent.seqnum + "] Will splice with previous Level for IDR start");
@@ -1332,18 +1334,29 @@ package com.pivotshare.hls.loader {
                         _emergencyFragmentDemuxedStream.close();
                         _emergencyFragmentDemuxedStream.removeEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
                         _emergencyFragmentDemuxedStream = null;
-
-                    } else { // bail leaving _emergencyFragment callback to recall this callback :(
+                    }
+                    else if (!isComplete) { // bail leaving _emergencyFragment callback to recall this callback :(
 
                         // TODO: Edge where this may not complete in time - do we force buffer or drop fix?
                         _emergencyFragmentDemuxedStream.addEventListener(Event.COMPLETE, _onEmergencyDemuxedStreamComplete);
 
                         CONFIG::LOGGING {
                             Log.debug("FragmentLoader#_onDemuxComplete: Fragment[" +
-                                _fragCurrent.level + "][" + _fragCurrent.seqnum + "] Cannot splice this non-IDR Fragment just yet");
+                                _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                                "] Cannot splice this non-IDR Fragment just yet. bytesLoaded / bytesTotal: " +
+                                _emergencyFragment.data.bytesLoaded + ' / ' +
+                                _emergencyFragment.data.bytesTotal);
                         }
 
                         return;
+                    }
+                    else {
+
+                        CONFIG::LOGGING {
+                            Log.error("FragmentLoader#_onDemuxComplete: Fragment[" +
+                                _fragCurrent.level + "][" + _fragCurrent.seqnum +
+                                "] Emergency Fragment did not have necessary video (???)");
+                        }
                     }
                 }
                 else if (HLSSettings.removePreIDRVideoTags) {
