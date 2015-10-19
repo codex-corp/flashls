@@ -357,7 +357,6 @@ package com.pivotshare.hls.loader {
 
             if (_demux) {
                 _demux.cancel();
-                _demux = null;
             }
         }
 
