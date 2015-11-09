@@ -703,7 +703,7 @@ package com.pivotshare.hls.loader {
                 if (frag_previous.program_date) {
                     last_seqnum = _levels[level].getSeqNumNearestProgramDate(frag_previous.program_date);
                     CONFIG::LOGGING {
-                        Log.debug("FragmentLoader#_loadnextfragment: getSeqNumFromProgramDate(level,date,cc:" + level + "," + frag_previous.program_date + ")=" + last_seqnum);
+                        Log.debug("FragmentLoader#_loadnextfragment: getSeqNumNearestProgramDate(level,date,cc:" + level + "," + frag_previous.program_date + ")=" + last_seqnum);
                     }
                 }
                 if (last_seqnum == -1) {
