@@ -194,6 +194,7 @@ package com.pivotshare.hls.loader {
             _streamBuffer = streamBuffer;
             _hls.addEventListener(HLSEvent.MANIFEST_LOADED, _manifestLoadedHandler);
             _hls.addEventListener(HLSEvent.LEVEL_LOADED, _levelLoadedHandler);
+            _hls.addEventListener(HLSEvent.LEVEL_LOADING_ABORTED, _levelLoadingAbortedHandler);
             _timer = new Timer(20, 0);
             _timer.addEventListener(TimerEvent.TIMER, _checkLoading);
             _loadingState = LOADING_STOPPED;
@@ -214,6 +215,7 @@ package com.pivotshare.hls.loader {
             stop();
             _hls.removeEventListener(HLSEvent.MANIFEST_LOADED, _manifestLoadedHandler);
             _hls.removeEventListener(HLSEvent.LEVEL_LOADED, _levelLoadedHandler);
+            _hls.removeEventListener(HLSEvent.LEVEL_LOADING_ABORTED, _levelLoadingAbortedHandler);
             _loadingState = LOADING_STOPPED;
             _keyLoader = new KeyLoader();
         }
@@ -319,6 +321,17 @@ package com.pivotshare.hls.loader {
                 _loadingState = LOADING_IDLE;
             }
             // speed up loading of new fragment
+            _timer.start();
+        };
+
+        /** Store the manifest data. **/
+        private function _levelLoadingAbortedHandler(event : HLSEvent) : void {
+            _levelNext = event.level-1;
+            CONFIG::LOGGING {
+                Log.warn("FragmentLoader:_levelLoadingAbortedHandler:switch down to:" + _levelNext);
+            }
+            _loadingState = LOADING_IDLE;
+            // speed up loading of new playlist/fragment
             _timer.start();
         };
 
