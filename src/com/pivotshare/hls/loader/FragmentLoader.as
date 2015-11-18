@@ -620,8 +620,10 @@ package com.pivotshare.hls.loader {
             the playlist on webserver is from SN [51-61]
             the one in memory is from SN [50-60], and we are trying to load SN50.
              */
+            var hlsError : HLSError = new HLSError(HLSError.FRAGMENT_LOADING_ERROR, _fragCurrent.url, "I/O Error while loading fragment:" + message);
+            _hls.dispatchEvent(new HLSEvent(HLSEvent.WARNING, hlsError));
             CONFIG::LOGGING {
-                Log.error("I/O Error while loading fragment:" + message);
+                Log.warn(hlsError.msg);
             }
             if (HLSSettings.fragmentLoadMaxRetry == -1 || _fragRetryCount < HLSSettings.fragmentLoadMaxRetry) {
                 _loadingState = LOADING_FRAGMENT_IO_ERROR;
@@ -633,6 +635,7 @@ package com.pivotshare.hls.loader {
                 _fragRetryCount++;
                 _fragRetryTimeout = Math.min(HLSSettings.fragmentLoadMaxRetryTimeout, 2 * _fragRetryTimeout);
             } else {
+                _hls.dispatchEvent(new HLSEvent(HLSEvent.WARNING, hlsError));
                 var level : Level = _levels[_fragCurrent.level];
                 // if we have redundant streams left for that level, switch to it
                 if(level.redundantStreamId < level.redundantStreamsNb) {
