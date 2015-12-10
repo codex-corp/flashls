@@ -18,6 +18,8 @@ package org.mangui.hls.event {
         public static const MANIFEST_LOADED : String = "hlsEventManifestLoaded";
         /** Identifier for a level loading event  **/
         public static const LEVEL_LOADING : String = "hlsEventLevelLoading";
+        /** Identifier for a level loading aborted event  **/
+        public static const LEVEL_LOADING_ABORTED : String = "hlsEventLevelLoadingAborted";
         /** Identifier for a level loaded event  **/
         public static const LEVEL_LOADED : String = "hlsEventLevelLoaded";
         /** Identifier for a level switch event. **/
@@ -32,6 +34,8 @@ package org.mangui.hls.event {
         public static const FRAGMENT_LOAD_EMERGENCY_ABORTED : String = "hlsEventFragmentLoadEmergencyAborted";
         /** Identifier for a fragment playing event. **/
         public static const FRAGMENT_PLAYING : String = "hlsEventFragmentPlaying";
+        /** Identifier for a fragment skipping event. **/
+        public static const FRAGMENT_SKIPPED : String = "hlsEventFragmentSkipped";
         /** Identifier for a audio tracks list change **/
         public static const AUDIO_TRACKS_LIST_CHANGE : String = "audioTracksListChange";
         /** Identifier for a audio track switch **/
@@ -44,6 +48,8 @@ package org.mangui.hls.event {
         public static const TAGS_LOADED : String = "hlsEventTagsLoaded";
         /** Identifier when last fragment of playlist has been loaded **/
         public static const LAST_VOD_FRAGMENT_LOADED : String = "hlsEventLastFragmentLoaded";
+        /** Identifier for a playback warning event. **/
+        public static const WARNING : String = "hlsEventWarning";
         /** Identifier for a playback error event. **/
         public static const ERROR : String = "hlsEventError";
         /** Identifier for a playback media time change event. **/
@@ -52,6 +58,8 @@ package org.mangui.hls.event {
         public static const PLAYBACK_STATE : String = "hlsPlaybackState";
         /** Identifier for a seek state switch event. **/
         public static const SEEK_STATE : String = "hlsSeekState";
+        /** Identifier for stream type changes: VoD or Live, type will be stored in 'streamType' field **/
+        public static const STREAM_TYPE_DID_CHANGE:String = "hlsEventStreamTypeDidChange";
         /** Identifier for a playback complete event. **/
         public static const PLAYBACK_COMPLETE : String = "hlsEventPlayBackComplete";
         /** Identifier for a Playlist Duration updated event **/
@@ -87,6 +95,8 @@ package org.mangui.hls.event {
         public var mediatime : HLSMediatime;
         /** The new playback state. **/
         public var state : String;
+        /** The new stream type value **/
+        public var streamType: String;
         /** The current audio track **/
         public var audioTrack : int;
         /** a complete ID3 payload from PES, as a hex dump **/
@@ -100,6 +110,7 @@ package org.mangui.hls.event {
                     url = parameter as String;
                     break;
                 case ERROR:
+                case WARNING:
                     error = parameter as HLSError;
                     break;
                 case TAGS_LOADED:
@@ -124,6 +135,7 @@ package org.mangui.hls.event {
                     state = parameter as String;
                     break;
                 case LEVEL_LOADING:
+                case LEVEL_LOADING_ABORTED:
                 case LEVEL_SWITCH:
                 case AUDIO_LEVEL_LOADING:
                 case FPS_DROP:
@@ -131,6 +143,7 @@ package org.mangui.hls.event {
                     level = parameter as int;
                     break;
                 case PLAYLIST_DURATION_UPDATED:
+                case FRAGMENT_SKIPPED:
                     duration = parameter as Number;
                     break;
                 case ID3_UPDATED:
@@ -139,10 +152,14 @@ package org.mangui.hls.event {
                 case FRAGMENT_PLAYING:
                     playMetrics = parameter as HLSPlayMetrics;
                     break;
+                case HLSEvent.STREAM_TYPE_DID_CHANGE:
+                    // Stream Type is required
+                    streamType = String(parameter);
+                    break;
                 default:
                     break;
             }
             super(type, false, false);
-        };
+        }
     }
 }
