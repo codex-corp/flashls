@@ -241,6 +241,22 @@ package com.pivotshare.hls.loader {
             _timer.start();
         }
 
+
+        public function seekFromLastFrag(lastFrag : Fragment) : void {
+            CONFIG::LOGGING {
+                Log.info("FragmentLoader:seekFromLastFrag(level:" + lastFrag.level + ",SN:" + lastFrag.seqnum + ",PTS:" + lastFrag.data.pts_start +")");
+            }
+            // reset IO Error when seeking
+            _fragRetryCount = _keyRetryCount = 0;
+            _fragRetryTimeout = _keyRetryTimeout = 1000;
+            _loadingState = LOADING_IDLE;
+            _fragmentFirstLoaded = true;
+            _fragSkipping = false;
+            _levelNext = -1;
+            _fragPrevious = lastFrag;
+            _timer.start();
+        }
+
         /**
          * Stop this FragmentLoader.
          *
@@ -685,7 +701,7 @@ package com.pivotshare.hls.loader {
                 // level switch
                 // trust program-time : if program-time defined in previous loaded fragment, try to find seqnum matching program-time in new level.
                 if (frag_previous.program_date) {
-                    last_seqnum = _levels[level].getSeqNumFromProgramDate(frag_previous.program_date);
+                    last_seqnum = _levels[level].getSeqNumNearestProgramDate(frag_previous.program_date);
                     CONFIG::LOGGING {
                         Log.debug("FragmentLoader#_loadnextfragment: getSeqNumFromProgramDate(level,date,cc:" + level + "," + frag_previous.program_date + ")=" + last_seqnum);
                     }
@@ -923,6 +939,7 @@ package com.pivotshare.hls.loader {
                     _onDemuxAudioTrackRequested,
                     _onDemuxProgress,
                     _onDemuxComplete,
+                    null,
                     _onDemuxVideoMetadata,
                     _onDemuxID3TagFound,
                     false
@@ -991,6 +1008,7 @@ package com.pivotshare.hls.loader {
                     _onDemuxAudioTrackRequested,
                     _onDemuxProgress,
                     _onDemuxComplete,
+                    null,
                     _onDemuxVideoMetadata,
                     _onDemuxID3TagFound,
                     false
@@ -1391,7 +1409,7 @@ package com.pivotshare.hls.loader {
                 _manifestJustLoaded = false;
                 if (HLSSettings.startFromLevel === -1 && HLSSettings.startFromBitrate === -1 && _levels.length > 1) {
                     // check if we can directly switch to a better bitrate, in case download bandwidth is enough
-                    var bestlevel : int = _levelController.getbestlevel(_metrics.bandwidth);
+                    var bestlevel : int = _levelController.getAutoStartBestLevel(_metrics.bandwidth,_metrics.processing_duration, 1000*_fragCurrent.duration);
                     if (bestlevel > _hls.loadLevel) {
                         CONFIG::LOGGING {
                             Log.info("FragmentLoader#_onDemuxComplete: enough download bandwidth, adjust start level from " + _hls.loadLevel + " to " + bestlevel);

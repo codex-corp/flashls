@@ -257,6 +257,7 @@ package com.pivotshare.hls.loader {
                     _onDemuxAudioTrackRequested,
                     _onDemuxProgress,
                     _onDemuxComplete,
+                    null,
                     _onDemuxVideoMetadata,
                     _onDemuxID3TagFound,
                     false
